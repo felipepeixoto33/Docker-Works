@@ -1,0 +1,42 @@
+version: '3.8'
+
+services:
+
+  {% for service in services %}
+  {{ service.name }}:
+    image: {{ service.image }}
+    ports:
+      - "{{ service.host_port }}:{{ service.container_port }}"
+    {% if service.dependencies %}
+    depends_on:
+      {% for dependency in service.dependencies %}
+      - {{ dependency }}
+      {% endfor %}
+    {% endif %}
+    {% if service.environment %}
+    environment:
+      {% for key, value in service.environment.items() %}
+      - {{ key }}={{ value }}
+      {% endfor %}
+    {% endif %}
+    {% if service.name == "nginx" %}
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf
+    {% endif %}
+  {% endfor %}
+  
+  master:
+    image: locustio/locust
+    ports:
+     - "8080:8089"
+    volumes:
+      - ./locustfile.py:/mnt/locust/locustfile.py
+      - ./files:/files
+    command: -f /mnt/locust/locustfile.py --master -H http://nginx
+  
+  worker:
+    image: locustio/locust
+    volumes:
+      - ./locustfile.py:/mnt/locust/locustfile.py
+      - ./files:/files
+    command: -f /mnt/locust/locustfile.py --worker --master-host master
